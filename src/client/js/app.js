@@ -14,7 +14,7 @@ var debug = function (args) {
 };
 
 if (/Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent)) {
-    global.mobile = true;
+    global.mobile = true; // モバイル端末かどうか判定
 }
 
 function startGame(type) {
@@ -32,17 +32,17 @@ function startGame(type) {
     }
     if (!global.animLoopHandle)
         animloop();
-    socket.emit('respawn');
+    socket.emit('respawn'); // 再出現
     window.chat.socket = socket;
     window.chat.registerFunctions();
     window.canvas.socket = socket;
     global.socket = socket;
 }
 
-// Checks if the nick chosen contains valid alphanumeric characters (and underscores).
+// ニックネームが英数字（アンダースコア含む）のみかチェック
 function validNick() {
     var regex = /^\w*$/;
-    debug('Regex Test', regex.exec(playerNameInput.value));
+    debug('正規表現チェック', regex.exec(playerNameInput.value));
     return regex.exec(playerNameInput.value) !== null;
 }
 
@@ -53,15 +53,15 @@ window.onload = function () {
         nickErrorText = document.querySelector('#startMenu .input-error');
 
     btnS.onclick = function () {
-        startGame('spectator');
+        startGame('spectator'); // 観戦モードで開始
     };
 
     btn.onclick = function () {
 
-        // Checks if the nick is valid.
+        // ニックネームの有効性をチェック
         if (validNick()) {
             nickErrorText.style.opacity = 0;
-            startGame('player');
+            startGame('player'); // プレイヤーモードで開始
         } else {
             nickErrorText.style.opacity = 1;
         }
@@ -84,7 +84,7 @@ window.onload = function () {
         if (key === global.KEY_ENTER) {
             if (validNick()) {
                 nickErrorText.style.opacity = 0;
-                startGame('player');
+                startGame('player'); // Enterで開始
             } else {
                 nickErrorText.style.opacity = 1;
             }
@@ -92,7 +92,7 @@ window.onload = function () {
     });
 };
 
-// TODO: Break out into GameControls.
+// TODO: GameControlsに分ける
 
 var playerConfig = {
     border: 6,
@@ -123,6 +123,7 @@ global.target = target;
 window.canvas = new Canvas();
 window.chat = new ChatClient();
 
+// 設定項目のイベント
 var visibleBorderSetting = document.getElementById('visBord');
 visibleBorderSetting.onchange = settings.toggleBorder;
 
@@ -139,36 +140,36 @@ var c = window.canvas.cv;
 var graph = c.getContext('2d');
 
 $("#feed").click(function () {
-    socket.emit('1');
+    socket.emit('1'); // 餌を出す
     window.canvas.reenviar = false;
 });
 
 $("#split").click(function () {
-    socket.emit('2');
+    socket.emit('2'); // 分裂
     window.canvas.reenviar = false;
 });
 
 function handleDisconnect() {
     socket.close();
-    if (!global.kicked) { // We have a more specific error message 
-        render.drawErrorMessage('Disconnected!', graph, global.screen);
+    if (!global.kicked) { 
+        render.drawErrorMessage('切断されました！', graph, global.screen);
     }
 }
 
-// socket stuff.
+// socket関連
 function setupSocket(socket) {
-    // Handle ping.
+    // ping処理
     socket.on('pongcheck', function () {
         var latency = Date.now() - global.startPingTime;
-        debug('Latency: ' + latency + 'ms');
+        debug('遅延: ' + latency + 'ms');
         window.chat.addSystemLine('Ping: ' + latency + 'ms');
     });
 
-    // Handle error.
+    // エラー処理
     socket.on('connect_error', handleDisconnect);
     socket.on('disconnect', handleDisconnect);
 
-    // Handle connection.
+    // 接続処理
     socket.on('welcome', function (playerSettings, gameSizes) {
         player = playerSettings;
         player.name = global.playerName;
@@ -179,8 +180,8 @@ function setupSocket(socket) {
         window.chat.player = player;
         socket.emit('gotit', player);
         global.gameStart = true;
-        window.chat.addSystemLine('Connected to the game!');
-        window.chat.addSystemLine('Type <b>-help</b> for a list of commands.');
+        window.chat.addSystemLine('ゲームに接続されました！');
+        window.chat.addSystemLine('コマンド一覧は <b>-help</b> を入力してください。');
         if (global.mobile) {
             document.getElementById('gameAreaWrapper').removeChild(document.getElementById('chatbox'));
         }
@@ -190,40 +191,38 @@ function setupSocket(socket) {
         resize();
     });
 
+    // プレイヤー死亡
     socket.on('playerDied', (data) => {
-        const player = isUnnamedCell(data.playerEatenName) ? 'An unnamed cell' : data.playerEatenName;
-        //const killer = isUnnamedCell(data.playerWhoAtePlayerName) ? 'An unnamed cell' : data.playerWhoAtePlayerName;
-
-        //window.chat.addSystemLine('{GAME} - <b>' + (player) + '</b> was eaten by <b>' + (killer) + '</b>');
-        window.chat.addSystemLine('{GAME} - <b>' + (player) + '</b> was eaten');
+        const player = isUnnamedCell(data.playerEatenName) ? '名前なしセル' : data.playerEatenName;
+        window.chat.addSystemLine('{GAME} - <b>' + (player) + '</b> によって食べられました');
     });
 
     socket.on('playerDisconnect', (data) => {
-        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + '</b> disconnected.');
+        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? '名前なしセル' : data.name) + '</b> が切断されました。');
     });
 
     socket.on('playerJoin', (data) => {
-        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + '</b> joined.');
+        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? '名前なしセル' : data.name) + '</b> が参加しました。');
     });
 
+    // リーダーボード更新
     socket.on('leaderboard', (data) => {
         leaderboard = data.leaderboard;
-        var status = '<span class="title">Leaderboard</span>';
+        var status = '<span class="title">リーダーボード</span>';
         for (var i = 0; i < leaderboard.length; i++) {
             status += '<br />';
             if (leaderboard[i].id == player.id) {
                 if (leaderboard[i].name.length !== 0)
                     status += '<span class="me">' + (i + 1) + '. ' + leaderboard[i].name + "</span>";
                 else
-                    status += '<span class="me">' + (i + 1) + ". An unnamed cell</span>";
+                    status += '<span class="me">' + (i + 1) + ". 名前なしセル</span>";
             } else {
                 if (leaderboard[i].name.length !== 0)
                     status += (i + 1) + '. ' + leaderboard[i].name;
                 else
-                    status += (i + 1) + '. An unnamed cell';
+                    status += (i + 1) + '. 名前なしセル';
             }
         }
-        //status += '<br />Players: ' + data.players;
         document.getElementById('status').innerHTML = status;
     });
 
@@ -231,12 +230,12 @@ function setupSocket(socket) {
         window.chat.addSystemLine(data);
     });
 
-    // Chat.
+    // チャット
     socket.on('serverSendPlayerChat', function (data) {
         window.chat.addChatLine(data.sender, data.message, false);
     });
 
-    // Handle movement.
+    // 移動処理
     socket.on('serverTellPlayerMove', function (playerData, userData, foodsList, massList, virusList) {
         if (global.playerType == 'player') {
             player.x = playerData.x;
@@ -251,10 +250,10 @@ function setupSocket(socket) {
         fireFood = massList;
     });
 
-    // Death.
+    // 死亡処理
     socket.on('RIP', function () {
         global.gameStart = false;
-        render.drawErrorMessage('You died!', graph, global.screen);
+        render.drawErrorMessage('あなたは死にました！', graph, global.screen);
         window.setTimeout(() => {
             document.getElementById('gameAreaWrapper').style.opacity = 0;
             document.getElementById('startMenuWrapper').style.maxHeight = '1000px';
@@ -265,14 +264,15 @@ function setupSocket(socket) {
         }, 2500);
     });
 
+    // キック処理
     socket.on('kick', function (reason) {
         global.gameStart = false;
         global.kicked = true;
         if (reason !== '') {
-            render.drawErrorMessage('You were kicked for: ' + reason, graph, global.screen);
+            render.drawErrorMessage('キックされました: ' + reason, graph, global.screen);
         }
         else {
-            render.drawErrorMessage('You were kicked!', graph, global.screen);
+            render.drawErrorMessage('キックされました！', graph, global.screen);
         }
         socket.close();
     });
@@ -307,6 +307,7 @@ function animloop() {
     gameLoop();
 }
 
+// メインゲームループ
 function gameLoop() {
     if (global.gameStart) {
         graph.fillStyle = global.backgroundColor;
@@ -326,8 +327,7 @@ function gameLoop() {
             render.drawVirus(position, virus, graph);
         });
 
-
-        let borders = { // Position of the borders on the screen
+        let borders = { // 画面上の境界位置
             left: global.screen.width / 2 - player.x,
             right: global.screen.width / 2 + global.game.width - player.x,
             top: global.screen.height / 2 - player.y,
@@ -358,7 +358,7 @@ function gameLoop() {
         });
         render.drawCells(cellsToDraw, playerConfig, global.toggleMassState, borders, graph);
 
-        socket.emit('0', window.canvas.target); // playerSendTarget "Heartbeat".
+        socket.emit('0', window.canvas.target); // プレイヤーのターゲット送信（ハートビート）
     }
 }
 
